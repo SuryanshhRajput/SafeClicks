@@ -1,90 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, FlatList, Platform } from 'react-native';
+// app/(tabs)/index.tsx
+import React, { useState } from 'react';
+import { View, TextInput, Text, StyleSheet, Platform, Keyboard } from 'react-native';
 import { Button } from 'react-native-elements';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Home() {
   const [link, setLink] = useState('');
-  const [result, setResult] = useState<{ safe: boolean; message: string } | null>(null);
-  const [history, setHistory] = useState<{ url: string; safe: boolean }[]>([]);
+  const [result, setResult] = useState<string>('');
 
-  // Load history from AsyncStorage on mount
-  useEffect(() => {
-    (async () => {
-      const saved = await AsyncStorage.getItem('scanHistory');
-      if (saved) setHistory(JSON.parse(saved));
-    })();
-  }, []);
-
-  // Save updated history whenever it changes
-  useEffect(() => {
-    AsyncStorage.setItem('scanHistory', JSON.stringify(history));
-  }, [history]);
-
-  // Select API URL based on platform (iOS Simulator, Android Emulator, or Physical Device)
   const API_BASE = Platform.select({
-    ios: 'http://localhost:5000', // For iOS Simulator
-    android: 'http://10.0.2.2:5000', // For Android Emulator
-    default: 'http://10.12.95.96:5000', // For physical devices (replace with your local IP)
+    ios: 'http://localhost:5000',
+    android: 'http://10.0.2.2:5000',
+    default: 'http://10.12.95.96:5000',
   });
 
+  interface ApiResponse {
+    message: string;
+  }
+
   const checkLink = async () => {
-    if (!link) return;
-    setResult({ safe: true, message: 'Checking...' });
-
+    if (!link.trim()) return;
+    Keyboard.dismiss();
+    setResult('Checking...');
     try {
-      const { data } = await axios.post<{ safe: boolean; message: string }>(
+      const { data } = await axios.post<ApiResponse>(
         `${API_BASE}/api/check-link`,
-        { url: link }
+        { url: link.trim() }
       );
-
-      setResult(data);
-
-      // Append to history
-      setHistory(prev => [{ url: link, safe: data.safe }, ...prev]);
-      setLink('');
+      setResult(data.message);
     } catch {
-      setResult({ safe: false, message: 'Error contacting API' });
+      setResult('Error contacting API');
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>SafeClicks Scanner</Text>
-
+      <Text style={styles.header}>SafeClicks</Text>
       <TextInput
-        placeholder="Enter URL"
         style={styles.input}
+        placeholder="Paste link here"
         value={link}
         onChangeText={setLink}
+        autoCapitalize="none"
       />
-      <Button title="Check Link" onPress={checkLink} />
-
-      {result && (
-        <Text style={[styles.result, { color: result.safe ? 'green' : 'red' }]}>
-          {result.message}
-        </Text>
-      )}
-
-      <Text style={styles.subheader}>History</Text>
-      <FlatList
-        data={history}
-        keyExtractor={(item, i) => `${item.url}-${i}`}
-        renderItem={({ item }) => (
-          <Text style={{ color: item.safe ? 'green' : 'red', marginVertical: 2 }}>
-            {item.url} — {item.safe ? 'Safe' : 'Unsafe'}
-          </Text>
-        )}
-      />
+      <Button title="Check" onPress={checkLink} />
+      {result ? <Text style={styles.result}>{result}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  header: { fontSize: 24, marginBottom: 12, textAlign: 'center' },
-  subheader: { fontSize: 18, marginTop: 20, marginBottom: 8 },
-  input: { borderWidth: 1, padding: 10, borderRadius: 5, marginBottom: 10 },
-  result: { marginTop: 10, fontSize: 16, textAlign: 'center' },
+  container: { flex:1, padding:20, justifyContent:'center' },
+  header: { fontSize:24, textAlign:'center', marginBottom:20 },
+  input: { borderWidth:1, borderColor:'#ccc', padding:10, marginBottom:10, borderRadius:5 },
+  result: { textAlign:'center', marginTop:20, fontSize:18 }
 });
